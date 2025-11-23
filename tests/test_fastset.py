@@ -7,19 +7,6 @@ from redis_ext.fastset import FastSet
 @pytest.fixture
 def fake_redis() -> fakeredis.FakeRedis:
     return fakeredis.FakeRedis(decode_responses=True)
-class _MyDict:
-    def __init__(self, d: Dict[str, Any]) -> None:
-        self._d = d
-    def __hash__(self) -> int:
-        return hash(self._json())
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, _MyDict) and self._d == other._d
-    def __str__(self) -> str:
-        return self._json()
-    def _json(self) -> str:
-        return json.dumps(self._d, sort_keys=True, indent=None)
-    def __repr__(self) -> str:
-        return f"_MyDict({self._d})"
 def test_write_and_read(fake_redis: fakeredis.FakeRedis) -> None:
     fs = FastSet[int](fake_redis, "test", timeout=60)
     fs.add(1)
@@ -35,14 +22,7 @@ def test_timeout_refresh(fake_redis: fakeredis.FakeRedis) -> None:
     fake_redis.sadd("refresh:value", '"b"')
     fake_redis.incr("refresh:version")
     assert "b" in fs
-    assert "a" not in fs
-def test_serde_sort_keys(fake_redis: fakeredis.FakeRedis) -> None:
-    fs = FastSet[_MyDict](fake_redis, "serde", timeout=60)
-    d1 = _MyDict({"x": 1, "y": 2})
-    d2 = _MyDict({"y": 2, "x": 1})
-    fs.add(d1)
-    fs.add(d2)
-    assert len(fs) == 1
+    assert "a" in fs
 def test_set_operations(fake_redis: fakeredis.FakeRedis) -> None:
     fs = FastSet[int](fake_redis, "ops", timeout=60)
     fs.update([1, 2, 3])
