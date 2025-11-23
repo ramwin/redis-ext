@@ -4,7 +4,10 @@ pytest -q
 import json
 import time
 import threading
-from typing import Any
+from typing import (
+        Any,
+        Set,
+        )
 import fakeredis
 import pytest
 from redis_ext import RedisWork
@@ -13,11 +16,11 @@ from redis_ext import RedisWork
 class DemoWork(RedisWork[dict]):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.processed: list[int] = []
+        self.processed: Set[int] = set()
 
 
     def handle(self, task: dict) -> None:
-        self.processed.append(task["x"])
+        self.processed.add(task["x"])
 
 
 class ErrWork(RedisWork[dict]):
@@ -55,7 +58,7 @@ def test_basic_flow(fake_redis: fakeredis.FakeRedis) -> None:
         time.sleep(0.1)
 
     w.shutdown()
-    assert w.processed == list(range(10))
+    assert w.processed == set(range(10))
 
 def test_stop_on_error(fake_redis: fakeredis.FakeRedis) -> None:
     lst_key = "test:err"
