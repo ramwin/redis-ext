@@ -1,61 +1,27 @@
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
 [project]
 name = "redis-ext"
-dynamic = ["version"]
-description = ''
+version = "0.1.0"
+description = "Redis list consumer with thread-pool"
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
-keywords = []
-authors = [
-  { name = "Xiang Wang", email = "ramwin@qq.com" },
-]
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
-]
-dependencies = []
-
+dependencies = ["redis>=5.0"]
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-cov", "fakeredis[lua]"]
 [project.urls]
-Documentation = "https://github.com/Xiang Wang/redis-ext#readme"
-Issues = "https://github.com/Xiang Wang/redis-ext/issues"
-Source = "https://github.com/Xiang Wang/redis-ext"
-
-[tool.hatch.version]
-path = "src/redis_ext/__about__.py"
-
-[tool.hatch.envs.types]
-extra-dependencies = [
-  "mypy>=1.0.0",
-]
-[tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/redis_ext tests}"
-
-[tool.coverage.run]
-source_pkgs = ["redis_ext", "tests"]
-branch = true
-parallel = true
-omit = [
-  "src/redis_ext/__about__.py",
-]
-
-[tool.coverage.paths]
-redis_ext = ["src/redis_ext", "*/redis-ext/src/redis_ext"]
-tests = ["tests", "*/redis-ext/tests"]
-
-[tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
+Homepage = "https://github.com/ramwin/redis-ext"
+Repository = "https://github.com/ramwin/redis-ext"
+[tool.hatch.envs.default]
+dependencies = ["redis-ext[test]"]
+[tool.hatch.envs.default.scripts]
+test = "pytest -q"
+cov = "pytest --cov=redis_ext --cov-report=term-missing"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "--strict-markers"
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "N", "UP", "B", "C90"]
