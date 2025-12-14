@@ -68,6 +68,19 @@ class DebounceInfoTask(Generic[T]):
 
         return added_count == 1
 
+    def has_task(self, info: T) -> bool:
+        """
+        检查任务是否存在
+
+        Args:
+            info: 要检查的任务数据
+
+        Returns:
+            bool: 任务是否存在
+        """
+        task_data = self._serialize_task(info)
+        return self.client.zscore(self.key, task_data) is not None
+
     def pop_tasks(self, count: int = 10) -> List[T]:
         """
         弹出已到执行时间的任务（分数最小的任务）
@@ -181,12 +194,30 @@ if __name__ == '__main__':
 
     task_manager.pop_tasks(count=10)  # 清理
 
-    # 测试4: 延迟任务
-    print("\n=== 测试4: 延迟任务 ===")
-    task4 = {"type": "delayed", "message": "This is delayed"}
+    # 测试4: has_task - 检查任务是否存在
+    print("\n=== 测试4: has_task - 检查任务是否存在 ===")
+    task4a = {"task": "check_existence"}
+    task4b = {"task": "not_added"}
+
+    # 添加任务前
+    assert task_manager.has_task(task4a) is False, "添加前任务不应该存在"
+    assert task_manager.has_task(task4b) is False
+
+    # 添加任务
+    task_manager.add_task(task4a)
+    assert task_manager.has_task(task4a) is True, "添加后任务应该存在"
+    assert task_manager.has_task(task4b) is False, "未添加的任务不应该存在"
+
+    # 弹出任务后
+    task_manager.pop_tasks(count=1)
+    assert task_manager.has_task(task4a) is False, "弹出后任务不应该存在"
+
+    # 测试5: 延迟任务
+    print("\n=== 测试5: 延迟任务 ===")
+    task5 = {"type": "delayed", "message": "This is delayed"}
 
     start_time = time.time()
-    task_manager.add_task(task4, delay_seconds=2)
+    task_manager.add_task(task5, delay_seconds=2)
 
     # 立即尝试弹出，应该为空
     tasks = task_manager.pop_tasks(count=1)
@@ -199,10 +230,10 @@ if __name__ == '__main__':
     elapsed = time.time() - start_time
     assert elapsed >= 2, f"应该至少等待2秒，实际等待{elapsed:.2f}秒"
     assert len(tasks) == 1, "应该弹出1个延迟任务"
-    assert tasks[0] == task4, "弹出的延迟任务数据应该正确"
+    assert tasks[0] == task5, "弹出的延迟任务数据应该正确"
 
-    # 测试5: pop_tasks的count限制
-    print("\n=== 测试5: pop_tasks的count限制 ===")
+    # 测试6: pop_tasks的count限制
+    print("\n=== 测试6: pop_tasks的count限制 ===")
     # 清理环境，确保测试不受之前测试影响
     task_manager.clear()
     r.delete(task_key)
@@ -231,19 +262,19 @@ if __name__ == '__main__':
     assert len(tasks) == 2, "应该弹出剩余的2个任务"
     assert task_manager.get_pending_count() == 0, "应该没有剩余任务"
 
-    # 测试6: remove_task功能
-    print("\n=== 测试6: remove_task功能 ===")
-    task6 = {"type": "removable", "data": "to be removed"}
+    # 测试7: remove_task功能
+    print("\n=== 测试7: remove_task功能 ===")
+    task7 = {"type": "removable", "data": "to be removed"}
 
-    task_manager.add_task(task6)
+    task_manager.add_task(task7)
     assert task_manager.get_pending_count() == 1, "应该有1个任务"
 
-    removed = task_manager.remove_task(task6)
+    removed = task_manager.remove_task(task7)
     assert removed is True, "删除应该成功"
     assert task_manager.get_pending_count() == 0, "删除后应该没有任务"
 
-    # 测试7: 复杂数据类型
-    print("\n=== 测试7: 复杂数据类型 ===")
+    # 测试8: 复杂数据类型
+    print("\n=== 测试8: 复杂数据类型 ===")
     complex_task = {
         "nested": {"key": "value", "list": [1, 2, 3]},
         "numbers": [42, 3.14, 1e10],
@@ -256,8 +287,8 @@ if __name__ == '__main__':
     assert len(tasks) == 1, "应该弹出1个任务"
     assert tasks[0] == complex_task, "复杂数据类型应该正确序列化和反序列化"
 
-    # 测试8: 不同数据类型的泛型支持
-    print("\n=== 测试8: 不同数据类型的泛型支持 ===")
+    # 测试9: 不同数据类型的泛型支持
+    print("\n=== 测试9: 不同数据类型的泛型支持 ===")
 
     # 字符串类型
     str_manager = DebounceInfoTask[str](r, 'test_str_tasks_complete')
@@ -289,8 +320,8 @@ if __name__ == '__main__':
     list_manager.add_task(duplicate_list)
     assert list_manager.get_pending_count() == 1, "相同内容的列表应该被去重"
 
-    # 测试9: 相同时间戳的任务删除验证
-    print("\n=== 测试9: 相同时间戳的任务删除验证 ===")
+    # 测试10: 相同时间戳的任务删除验证
+    print("\n=== 测试10: 相同时间戳的任务删除验证 ===")
     task_manager.clear()
     r.delete(task_key)
 
@@ -315,8 +346,8 @@ if __name__ == '__main__':
     assert len(tasks) == 1, "应该弹出剩余的1个任务"
     assert task_manager.get_pending_count() == 0, "应该没有剩余任务"
 
-    # 测试10: 任务排序（按延迟时间）
-    print("\n=== 测试10: 任务排序 ===")
+    # 测试11: 任务排序（按延迟时间）
+    print("\n=== 测试11: 任务排序 ===")
     task_manager.clear()
     r.delete(task_key)
 
@@ -352,17 +383,17 @@ if __name__ == '__main__':
     assert tasks[0] == {"task": "c"}, "应该弹出延迟5秒的任务"
     assert task_manager.get_pending_count() == 0, "应该没有剩余任务"
 
-    # 测试11: 默认延迟时间
-    print("\n=== 测试11: 默认延迟时间 ===")
+    # 测试12: 默认延迟时间
+    print("\n=== 测试12: 默认延迟时间 ===")
     task_key_default = 'test_default_delay'
     r.delete(task_key_default)
 
     # 创建实例时设置默认延迟3秒
     task_manager_default = DebounceInfoTask[dict](r, task_key_default, delay_seconds=3)
 
-    task11 = {"message": "delayed by default"}
+    task12 = {"message": "delayed by default"}
     start_time = time.time()
-    added = task_manager_default.add_task(task11)  # 使用默认延迟
+    added = task_manager_default.add_task(task12)  # 使用默认延迟
     assert added is True, "添加任务应该成功"
 
     # 立即尝试弹出，应该为空
@@ -376,37 +407,37 @@ if __name__ == '__main__':
     elapsed = time.time() - start_time
     assert elapsed >= 3, f"应该至少等待3秒，实际等待{elapsed:.2f}秒"
     assert len(tasks) == 1, "应该弹出1个任务"
-    assert tasks[0] == task11, "弹出的任务数据应该正确"
+    assert tasks[0] == task12, "弹出的任务数据应该正确"
 
-    # 测试12: 覆盖默认延迟时间
-    print("\n=== 测试12: 覆盖默认延迟时间 ===")
+    # 测试13: 覆盖默认延迟时间
+    print("\n=== 测试13: 覆盖默认延迟时间 ===")
     task_key_override = 'test_override_delay'
     r.delete(task_key_override)
 
     # 创建实例时设置默认延迟5秒
     task_manager_override = DebounceInfoTask[dict](r, task_key_override, delay_seconds=5)
 
-    task12a = {"message": "using override delay"}
-    task12b = {"message": "using default delay"}
+    task13a = {"message": "using override delay"}
+    task13b = {"message": "using default delay"}
 
     # 覆盖默认延迟，只延迟1秒
-    task_manager_override.add_task(task12a, delay_seconds=1)
+    task_manager_override.add_task(task13a, delay_seconds=1)
     # 使用默认延迟5秒
-    task_manager_override.add_task(task12b)
+    task_manager_override.add_task(task13b)
 
     assert task_manager_override.get_pending_count() == 2, "应该有2个任务"
 
     # 等待1.5秒
     time.sleep(1.5)
 
-    # 应该只弹出task12a
+    # 应该只弹出task13a
     tasks = task_manager_override.pop_tasks(count=5)
     assert len(tasks) == 1, "应该只弹出1个任务"
-    assert tasks[0] == task12a, "应该弹出使用1秒延迟的任务"
+    assert tasks[0] == task13a, "应该弹出使用1秒延迟的任务"
     assert task_manager_override.get_pending_count() == 1, "应该还有1个任务（使用默认延迟的）"
 
-    # 测试13: 立即执行（delay_seconds=0）
-    print("\n=== 测试13: 立即执行 ===")
+    # 测试14: 立即执行（delay_seconds=0）
+    print("\n=== 测试14: 立即执行 ===")
     task_key_immediate = 'test_immediate'
     r.delete(task_key_immediate)
 
@@ -419,28 +450,28 @@ if __name__ == '__main__':
     assert len(tasks) == 1, "应该立即弹出任务"
     assert tasks[0] == immediate_task, "弹出的任务数据应该正确"
 
-    # 测试14: 去重功能验证（带默认延迟）
-    print("\n=== 测试14: 去重功能验证（带默认延迟）===")
+    # 测试15: 去重功能验证（带默认延迟）
+    print("\n=== 测试15: 去重功能验证（带默认延迟）===")
     task_key_dedup = 'test_dedup_with_delay'
     r.delete(task_key_dedup)
 
     task_manager_dedup = DebounceInfoTask[dict](r, task_key_dedup, delay_seconds=2)
 
-    task14 = {"task": "dedup_test"}
+    task15 = {"task": "dedup_test"}
 
     # 添加两次，应该只有第一次成功
-    added1 = task_manager_dedup.add_task(task14)
-    added2 = task_manager_dedup.add_task(task14)  # 重复
+    added1 = task_manager_dedup.add_task(task15)
+    added2 = task_manager_dedup.add_task(task15)  # 重复
     assert added1 is True, "第一次添加应该成功"
     assert added2 is False, "重复添加应该失败"
     assert task_manager_dedup.get_pending_count() == 1, "去重后应该只有1个任务"
 
     # 测试覆盖延迟时间时也能正确去重
-    added3 = task_manager_dedup.add_task(task14, delay_seconds=5)  # 不同的延迟时间
+    added3 = task_manager_dedup.add_task(task15, delay_seconds=5)  # 不同的延迟时间
     assert added3 is False, "即使延迟时间不同，相同内容也应该被去重"
 
-    # 测试15: get_info方法 - 获取任务统计信息
-    print("\n=== 测试15: get_info方法 ===")
+    # 测试16: get_info方法 - 获取任务统计信息
+    print("\n=== 测试16: get_info方法 ===")
     task_key_info = 'test_get_info'
     r.delete(task_key_info)
 
@@ -448,6 +479,9 @@ if __name__ == '__main__':
 
     # 初始状态
     info = task_manager_info.get_info()
+    assert isinstance(info, dict), "get_info应该返回字典"
+    assert "remain_cnt" in info, "应该包含remain_cnt"
+    assert "overtime_cnt" in info, "应该包含overtime_cnt"
     assert info["remain_cnt"] == 0, "初始remain_cnt应该为0"
     assert info["overtime_cnt"] == 0, "初始overtime_cnt应该为0"
 
