@@ -1,6 +1,7 @@
 import time
 import json
 from typing import TypeVar, Generic, List, Any, Optional, TypedDict
+from .types import RedisClient
 import redis
 
 T = TypeVar('T')  # 泛型类型
@@ -18,7 +19,7 @@ class DebounceInfoTask(Generic[T]):
     基于序列化后的结果进行去重，相同内容的任务不会重复添加
     """
 
-    def __init__(self, client: redis.Redis, key: str, delay_seconds: float = 0):
+    def __init__(self, client: RedisClient, key: str, delay_seconds: float = 0):
         """
         初始化DebounceInfoTask实例
 

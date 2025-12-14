@@ -29,3 +29,6 @@ line-length = 88
 select = ["E", "F", "I", "N", "UP", "B", "C90"]
 [tool.hatch.version]
 path = "src/redis_ext/__about__.py"
+
+[tool.setuptools.package-data]
+redis_ext = ["src/redis_ext/py.typed"]
