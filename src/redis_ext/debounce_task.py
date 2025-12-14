@@ -1,9 +1,16 @@
 import time
 import json
-from typing import TypeVar, Generic, List, Any, Optional
+from typing import TypeVar, Generic, List, Any, Optional, TypedDict
 import redis
 
 T = TypeVar('T')  # 泛型类型
+
+
+class DebounceInfo(TypedDict):
+    """任务统计信息类型"""
+    remain_cnt: int  # 剩余任务总数
+    overtime_cnt: int  # 已超时但未处理的任务数
+
 
 class DebounceInfoTask(Generic[T]):
     """
@@ -109,6 +116,24 @@ class DebounceInfoTask(Generic[T]):
     def clear(self) -> None:
         """清空所有任务"""
         self.client.delete(self.key)
+
+    def get_info(self) -> DebounceInfo:
+        """
+        获取任务统计信息
+
+        Returns:
+            DebounceInfo: 包含remain_cnt和overtime_cnt的字典
+        """
+        current_time = time.time()
+        # 统计已超时（分数小于等于当前时间）的任务数量
+        overtime_cnt = self.client.zcount(self.key, '-inf', current_time)
+        # 获取剩余任务总数
+        remain_cnt = self.get_pending_count()
+
+        return {
+            "remain_cnt": remain_cnt,
+            "overtime_cnt": overtime_cnt
+        }
 
 
 # 测试用例
@@ -264,7 +289,7 @@ if __name__ == '__main__':
     list_manager.add_task(duplicate_list)
     assert list_manager.get_pending_count() == 1, "相同内容的列表应该被去重"
 
-    # 测试9: 测试相同时间戳的任务（验证pop_tasks的正确删除）
+    # 测试9: 相同时间戳的任务删除验证
     print("\n=== 测试9: 相同时间戳的任务删除验证 ===")
     task_manager.clear()
     r.delete(task_key)
@@ -326,6 +351,7 @@ if __name__ == '__main__':
     assert len(tasks) == 1, "应该弹出最后1个任务"
     assert tasks[0] == {"task": "c"}, "应该弹出延迟5秒的任务"
     assert task_manager.get_pending_count() == 0, "应该没有剩余任务"
+
     # 测试11: 默认延迟时间
     print("\n=== 测试11: 默认延迟时间 ===")
     task_key_default = 'test_default_delay'
@@ -413,6 +439,34 @@ if __name__ == '__main__':
     added3 = task_manager_dedup.add_task(task14, delay_seconds=5)  # 不同的延迟时间
     assert added3 is False, "即使延迟时间不同，相同内容也应该被去重"
 
+    # 测试15: get_info方法 - 获取任务统计信息
+    print("\n=== 测试15: get_info方法 ===")
+    task_key_info = 'test_get_info'
+    r.delete(task_key_info)
+
+    task_manager_info = DebounceInfoTask[dict](r, task_key_info)
+
+    # 初始状态
+    info = task_manager_info.get_info()
+    assert info["remain_cnt"] == 0, "初始remain_cnt应该为0"
+    assert info["overtime_cnt"] == 0, "初始overtime_cnt应该为0"
+
+    # 添加3个任务：2个已超时，1个未超时
+    task_manager_info.add_task({"task": "overtime1"}, delay_seconds=0)  # 立即超时
+    time.sleep(0.1)  # 确保时间差
+    task_manager_info.add_task({"task": "overtime2"}, delay_seconds=0)  # 立即超时
+    task_manager_info.add_task({"task": "future"}, delay_seconds=5)  # 5秒后超时
+
+    info = task_manager_info.get_info()
+    assert info["remain_cnt"] == 3, "应该总共有3个任务"
+    assert info["overtime_cnt"] == 2, "应该有2个已超时任务"
+
+    # 弹出1个超时任务
+    task_manager_info.pop_tasks(count=1)
+    info = task_manager_info.get_info()
+    assert info["remain_cnt"] == 2, "弹出1个后应该剩余2个任务"
+    assert info["overtime_cnt"] == 1, "弹出1个后应该剩余1个超时任务"
+
     print("\n=== 所有测试通过! ===")
 
     # 清理所有测试key
@@ -423,6 +477,7 @@ if __name__ == '__main__':
         task_key_default,
         task_key_override,
         task_key_immediate,
-        task_key_dedup
+        task_key_dedup,
+        task_key_info
     ]
     r.delete(*test_keys)
