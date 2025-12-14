@@ -307,16 +307,25 @@ if __name__ == '__main__':
     tasks = task_manager.pop_tasks(count=5)
     assert len(tasks) == 1, "应该只弹出1个任务（延迟1秒的那个）"
     assert tasks[0] == {"task": "a"}, "应该弹出延迟最短的任务"
+    assert task_manager.get_pending_count() == 2, "应该还剩2个任务（b和c）"
 
-    # 等待剩余时间
+    # 等待2秒（总共3.5秒，让b任务到期，但c任务还没到5秒）
     time.sleep(2)
 
-    # 弹出剩余任务
+    # 应该只弹出task 'b'
     tasks = task_manager.pop_tasks(count=5)
-    assert len(tasks) == 2, "应该弹出剩余的2个任务"
-    assert {"task": "b"} in tasks, "应该包含第二个任务"
-    assert {"task": "c"} in tasks, "应该包含第三个任务"
+    assert len(tasks) == 1, "应该弹出1个任务"
+    assert tasks[0] == {"task": "b"}, "应该弹出延迟3秒的任务"
+    assert task_manager.get_pending_count() == 1, "应该还剩1个任务（c）"
 
+    # 再等待2秒（总共5.5秒，让c任务也到期）
+    time.sleep(2)
+
+    # 弹出最后一个任务
+    tasks = task_manager.pop_tasks(count=5)
+    assert len(tasks) == 1, "应该弹出最后1个任务"
+    assert tasks[0] == {"task": "c"}, "应该弹出延迟5秒的任务"
+    assert task_manager.get_pending_count() == 0, "应该没有剩余任务"
     # 测试11: 默认延迟时间
     print("\n=== 测试11: 默认延迟时间 ===")
     task_key_default = 'test_default_delay'
