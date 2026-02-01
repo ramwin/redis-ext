@@ -149,6 +149,9 @@ class DebounceInfoTask(Generic[T]):
             "overtime_cnt": overtime_cnt
         }
 
+    def __str__(self):
+        return self.key
+
 
 # 测试用例
 if __name__ == '__main__':
