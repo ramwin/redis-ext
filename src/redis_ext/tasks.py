@@ -4,6 +4,7 @@
 
 
 from .debounce_task import DebounceInfoTask
+from .json_task_queue import JsonTaskQueue
 
 
-__all__ = ["DebounceInfoTask"]
+__all__ = ["DebounceInfoTask", "JsonTaskQueue"]
