@@ -2,4 +2,5 @@
 #
 # SPDX-License-Identifier: MIT
 
+from .candlestick_task import CandleStickTask
 from .worker import RedisWork
