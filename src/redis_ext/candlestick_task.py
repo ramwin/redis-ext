@@ -4,9 +4,16 @@
 
 import json
 import time
-from typing import Any, Dict, List, Optional
+from typing import List, Optional, TypedDict
 
 from .types import RedisClient
+
+
+class CandleStickTaskData(TypedDict):
+    """K线统计任务数据类型"""
+    stock: str       # 股票代码
+    period: int      # 统计周期（秒）
+    window: int      # 时间窗口起始时间戳
 
 
 class CandleStickTask:
@@ -79,9 +86,13 @@ class CandleStickTask:
         added = self.client.zadd(self.key, {task_data: execute_at}, nx=True)
         return added == 1
 
-    def pop_tasks(self, count: int = 10) -> List[Dict[str, Any]]:
+    def pop_tasks(self, count: int = 10) -> List[CandleStickTaskData]:
         """
         弹出已到执行时间的任务
+
+        先查询到期任务，再逐个 ``zrem`` 尝试删除；
+        只有 ``zrem`` 返回 1（真正删除成功）的任务才会被返回，
+        从而保证多进程/多实例并发调用时不会出现重复处理。
 
         Args:
             count: 本次最多弹出的任务数量
@@ -98,13 +109,16 @@ class CandleStickTask:
         if not tasks_data:
             return []
 
+        # 逐个尝试删除，只有真正删成功的才是本进程抢到的
         pipeline = self.client.pipeline()
         for task_bytes in tasks_data:
             pipeline.zrem(self.key, task_bytes)
-        pipeline.execute()
+        results = pipeline.execute()
 
-        tasks: List[Dict[str, Any]] = []
-        for task_bytes in tasks_data:
+        tasks: List[CandleStickTaskData] = []
+        for task_bytes, removed in zip(tasks_data, results):
+            if not removed:
+                continue
             task_str = (
                 task_bytes.decode("utf-8")
                 if isinstance(task_bytes, bytes)
@@ -122,7 +136,7 @@ class CandleStickTask:
         *,
         interval: float = 0.1,
         count: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[CandleStickTaskData]:
         """
         阻塞等待直到有可执行的任务
 
